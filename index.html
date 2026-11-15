@@ -1,0 +1,334 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROVIX 8D</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;min-height:100vh;padding:20px;
+ background:radial-gradient(ellipse at top,#29134c,#080810 65%);
+ color:#fff;font-family:Arial;display:grid;place-items:center
+}
+.app{
+ width:100%;max-width:680px;padding:24px;
+ background:#10101b;border:1px solid #543a83;
+ border-radius:18px;box-shadow:0 0 40px #713bd333
+}
+header{text-align:center;margin-bottom:25px}
+.logo{
+ font-size:38px;font-weight:900;letter-spacing:10px;
+ color:#c0a2ff;text-shadow:0 0 20px #8754ff
+}
+header p{font-size:11px;letter-spacing:4px;color:#817995}
+.status{
+ display:flex;justify-content:space-between;
+ background:#080812;padding:14px;
+ border:1px solid #29213e;border-radius:9px;
+ font-size:12px;margin-bottom:20px
+}
+.dot{display:inline-block;width:8px;height:8px;
+ background:#777;border-radius:50%;margin-right:7px}
+label{display:block;color:#a99ac8;font-size:12px;margin:15px 0 8px}
+select{
+ width:100%;padding:13px;background:#171525;
+ color:white;border:1px solid #483766;border-radius:9px
+}
+.buttons,.footer{display:flex;gap:10px;margin-top:14px}
+button{
+ border:0;border-radius:8px;padding:12px;
+ color:white;font-weight:bold;cursor:pointer
+}
+button:disabled{opacity:.45;cursor:not-allowed}
+.buttons button,.footer button{flex:1}
+#start{background:#704bd1}
+#stop{background:#983c50}
+#copyAll{background:#345c89}
+#clear{background:#49375f}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:18px}
+.stat{
+ background:#090912;border:1px solid #302443;
+ padding:13px 5px;text-align:center;border-radius:9px
+}
+.stat strong{display:block;color:#c2a8ff;font-size:21px}
+.stat small{font-size:10px;color:#89819b}
+.console{
+ margin-top:14px;height:330px;overflow:auto;
+ background:#05060c;border:1px solid #302443;
+ border-radius:10px;padding:12px;
+ font:12px/1.8 monospace;direction:ltr
+}
+.line{
+ display:flex;justify-content:space-between;
+ align-items:center;gap:5px;
+ border-bottom:1px solid #ffffff0c;padding:3px 0
+}
+.line span{color:#b9a7df;overflow-wrap:anywhere}
+.line .check{background:#33264e;padding:6px;font-size:10px}
+.line .copy{background:#263d5c;padding:6px;font-size:10px}
+.available{color:#48e69b!important}
+.taken{color:#ff758c!important}
+.invalid{color:#e5ad63!important}
+.error{color:#ffad76!important}
+</style>
+</head>
+<body>
+<main class="app">
+<header>
+ <div class="logo">ROVIX</div>
+ <p>8D USERNAME SCANNER</p>
+</header>
+
+<div class="status">
+ <span><i class="dot" id="dot"></i><span id="state">OFFLINE</span></span>
+ <span id="speed">0 / SEC</span>
+</div>
+
+<label>USERNAME TYPE</label>
+<select id="type">
+ <option value="3">TRIPLE — ark</option>
+ <option value="s3">SEMI TRIPLE — ar.k</option>
+ <option value="4">QUAD — zmxq</option>
+ <option value="s4">SEMI QUAD — zm.n</option>
+ <option value="5">QUINT — zmxq7</option>
+ <option value="s5">SEMI QUINT — zmx.7</option>
+ <option value="6">SEXTUPLE — zmxq77</option>
+</select>
+
+<label>GENERATION SPEED</label>
+<select id="rate">
+ <option value="100">100 / SEC</option>
+ <option value="500">500 / SEC</option>
+ <option value="1000" selected>1000 / SEC</option>
+</select>
+
+<div class="buttons">
+ <button id="start">START</button>
+ <button id="stop">STOP</button>
+</div>
+
+<div class="stats">
+ <div class="stat"><strong id="total">0</strong><small>GENERATED</small></div>
+ <div class="stat"><strong id="checked">0</strong><small>CHECKED</small></div>
+ <div class="stat"><strong id="available">0</strong><small>AVAILABLE</small></div>
+</div>
+
+<label>LIVE CONSOLE</label>
+<div class="console" id="console"></div>
+
+<div class="footer">
+ <button id="copyAll">COPY ALL</button>
+ <button id="clear">CLEAR CONSOLE</button>
+</div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let running = false;
+let timer = null;
+let count = 0;
+let checked = 0;
+let available = 0;
+let names = [];
+let checking = false;
+let lastGeneration = performance.now();
+
+const letters = "abcdefghijklmnopqrstuvwxyz";
+const all = letters + "0123456789";
+
+function random(chars){
+ return chars[Math.floor(Math.random()*chars.length)];
+}
+
+function generate(type){
+ let length = 3;
+ let dot = -1;
+
+ if(type==="3") length=3;
+ if(type==="s3"){length=3;dot=1}
+ if(type==="4") length=4;
+ if(type==="s4"){length=3;dot=2}
+ if(type==="5") length=5;
+ if(type==="s5"){length=4;dot=3}
+ if(type==="6") length=6;
+
+ let result="";
+
+ for(let i=0;i<length;i++){
+  if(i===dot) result+=".";
+  result+=random(i===0?letters:all);
+ }
+
+ return result;
+}
+
+function log(name,status="pending"){
+ const row=document.createElement("div");
+ row.className="line";
+
+ const text=document.createElement("span");
+ text.textContent=name;
+ text.className=status;
+
+ const controls=document.createElement("div");
+
+ const check=document.createElement("button");
+ check.className="check";
+ check.textContent="CHECK";
+ check.onclick=()=>verify(name,row,text,check);
+
+ const copy=document.createElement("button");
+ copy.className="copy";
+ copy.textContent="COPY";
+ copy.onclick=()=>copyText(name,copy);
+
+ controls.append(check,copy);
+ row.append(text,controls);
+
+ $("console").append(row);
+ while($("console").children.length>200){
+  $("console").firstElementChild.remove();
+ }
+
+ $("console").scrollTop=$("console").scrollHeight;
+ return row;
+}
+
+async function copyText(text,button){
+ try{
+  await navigator.clipboard.writeText(text);
+  if(button){
+   button.textContent="COPIED";
+   setTimeout(()=>button.textContent="COPY",1000);
+  }
+ }catch(e){
+  const input=document.createElement("textarea");
+  input.value=text;
+  document.body.append(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
+ }
+}
+
+async function verify(name,row,text,button){
+ if(checking)return;
+ checking=true;
+ button.disabled=true;
+ button.textContent="WAIT";
+
+ try{
+  const response=await fetch("/api/check",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({username:name})
+  });
+
+  const data=await response.json();
+
+  if(data.status==="available"){
+   available++;
+   $("available").textContent=available;
+   text.className="available";
+   text.textContent=name+" — AVAILABLE";
+   button.textContent="FOUND";
+   stop();
+  }
+  else if(data.status==="taken"){
+   text.className="taken";
+   text.textContent=name+" — TAKEN";
+   button.textContent="TAKEN";
+  }
+  else if(data.status==="invalid"){
+   text.className="invalid";
+   text.textContent=name+" — INVALID";
+   button.textContent="INVALID";
+  }
+  else{
+   text.className="error";
+   text.textContent=name+" — "+(data.status||"UNKNOWN").toUpperCase();
+   button.textContent="RETRY";
+   button.disabled=false;
+  }
+
+  checked++;
+  $("checked").textContent=checked;
+
+ }catch(e){
+  text.className="error";
+  text.textContent=name+" — CONNECTION ERROR";
+  button.textContent="RETRY";
+  button.disabled=false;
+ }finally{
+  checking=false;
+ }
+}
+
+function stop(){
+ running=false;
+ if(timer!==null)clearInterval(timer);
+ timer=null;
+ $("state").textContent="STOPPED";
+ $("dot").style.background="#777";
+ $("speed").textContent="0 / SEC";
+}
+
+function start(){
+ if(running)return;
+
+ running=true;
+ $("state").textContent="RUNNING";
+ $("dot").style.background="#48e69b";
+
+ const rate=Number($("rate").value);
+ const type=$("type").value;
+ const batch=Math.max(1,Math.floor(rate/10));
+
+ timer=setInterval(()=>{
+  if(!running)return;
+
+  for(let i=0;i<batch;i++){
+   const name=generate(type);
+   names.push(name);
+   count++;
+   log(name);
+  }
+
+  $("total").textContent=count.toLocaleString();
+
+  const now=performance.now();
+  const elapsed=(now-lastGeneration)/1000;
+  if(elapsed>=1){
+   $("speed").textContent=Math.round(batch*10/elapsed)+" / SEC";
+   lastGeneration=now;
+  }
+ },100);
+}
+
+$("start").onclick=start;
+$("stop").onclick=stop;
+
+$("copyAll").onclick=async()=>{
+ await copyText(names.join("\n"),$("copyAll"));
+ $("copyAll").textContent="COPIED ALL";
+ setTimeout(()=>$("copyAll").textContent="COPY ALL",1200);
+};
+
+$("clear").onclick=()=>{
+ stop();
+ names=[];
+ count=0;
+ checked=0;
+ available=0;
+ $("total").textContent="0";
+ $("checked").textContent="0";
+ $("available").textContent="0";
+ $("console").innerHTML="";
+};
+
+</script>
+</body>
+</html>
